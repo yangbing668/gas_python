@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>气井数据处理</title>
+    <style>
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* 如果你想让整个表单垂直居中 */
+            height: 100vh; /* 设置一个合适的高度以便垂直居中可见 */
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box; /* 包括内边距和边框在内来计算元素的宽度和高度 */
+        }
+
+        .form-row {
+            margin-bottom: 20px; /* 根据需要调整间距 */
+            text-align: center;
+        }
+
+        .form-row label {
+            display: block; /* 确保标签在新的一行 */
+            margin-bottom: 5px; /* 标签和输入框之间的间距 */
+        }
+
+        input[type="text"],
+        input[type="submit"] {
+            width: 200px; /* 根据需要设置输入框的宽度 */
+            padding: 5px;
+        }
+
+        #processing-message, #success-message {
+            display: none; /* 默认情况下不显示 */
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+<form id="gasWellForm" method="post" action="/deal">
+
+<!--    <div class="form-row">-->
+<!--        <label for="rcqpath">所有气井日产数据文件:</label>-->
+<!--        <input type="text" id="rcqpath" name="rcqpath" value="input/all-6.7.csv" required>-->
+<!--    </div>-->
+
+    <div class="form-row">
+        <label for="selectOption">增产措施方式:</label>
+        <select id="selectOption" name="selectOption" required onchange="updateInputValues()">
+            <option value="">请选择...</option>
+            <option value="泡排">泡排</option>
+            <option value="增压">增压</option>
+            <option value="连续气举">连续气举</option>
+            <option value="间断气举">间断气举</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="pppath">台账数据文件地址:</label>
+        <input type="file" id="pppath" name="pppath" required>
+    </div>
+
+    <div class="form-row">
+        <label for="d">措施前后平均日产天数:</label>
+        <input type="number" id="d" name="d" required>
+    </div>
+
+    <div id="someDiv" style="display: block;">
+        <div class="form-row">
+            <label for="dr">日递减率:</label>
+            <input type="float" id="dr" name="dr" required>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="countdays">统计时长（措施后天数，输入-1表示统计到台账截止日期）:</label>
+        <input type="number" id="countdays" name="countdays" required>
+    </div>
+
+<!--    <div class="form-row">-->
+<!--        <label for="savepath">增产气量结果保存地址:</label>-->
+<!--        <input type="text" id="savepath" name="savepath" required>-->
+<!--    </div>-->
+
+    <div id="processing-message">处理中...</div>
+    <div id="success-message">处理成功！</div>
+    <div class="form-row">
+        <input type="submit" id="submitButton" value="增产气量计算">
+    </div>
+</form>
+
+
+<script>
+    function updateInputValues() {
+        var selectOption = document.getElementById('selectOption');
+        var someDiv = document.getElementById('someDiv');
+
+        switch (selectOption.value) {
+            case '泡排':
+                someDiv.style.display = 'block';
+                // pppath.value = "input/☆泡排台账（核实）-2023.10.31.csv"; // 假设的特定默认值
+                d.value = '30';
+                dr.value = '0.0';
+                countdays.value = '-1';
+                savepath.value = "output/泡排增产气量.csv";
+                break;
+            case '增压':
+                someDiv.style.display = 'block';
+                pppath.value = "input/☆增压（核实）-2023.12.31.csv"; // 假设的特定默认值
+                dr.value = '0.00036';
+                d.value = '30';
+                countdays.value = '-1';
+                savepath.value = "output/增压增产气量.csv"
+                break;
+            case '连续气举':
+                someDiv.style.display = 'block';
+                pppath.value = "input/☆气举台账-2019-2023.xlsx"; // 假设的特定默认值
+                d.value = '15';
+                dr.value = '0.0006';
+                countdays.value = '-1';
+                savepath.value = "output/连续气举增产气量(递减0.06%).csv"
+                break;
+            case '间断气举':
+                someDiv.style.display = 'block';
+                pppath.value = "input/☆气举台账-2019-2023.xlsx"; // 假设的特定默认值
+                d.value = '15';
+                dr.value = '0.0';
+                countdays.value = '-1';
+                savepath.value = "output/间断气举增产气量(无递减).csv"
+                break;
+
+        }
+    }
+
+    document.getElementById('gasWellForm').addEventListener('submit', function (event) {
+        event.preventDefault(); // 阻止表单的默认提交行为
+        // 显示处理中信息
+        var processingMessage = document.getElementById('processing-message');
+        processingMessage.style.display = 'block';
+        // 清除处理成功信息（如果有的话）
+        var successMessage = document.getElementById('success-message');
+        successMessage.style.display = 'none';
+
+        var submitButton = document.getElementById('submitButton');
+        submitButton.disabled = true; // 禁用按钮
+
+        // 使用Ajax发送表单数据
+        var formData = new FormData(this);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', this.action, true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                // 服务器响应成功，隐藏处理中信息，显示成功信息
+                processingMessage.style.display = 'none';
+                successMessage.style.display = 'block';
+                submitButton.disabled = false; // 启用按钮
+                // 在这里可以根据服务器返回的具体内容来更新页面
+                // 例如，您可能想将服务器的响应内容显示在某个地方
+                // var serverResponse = JSON.parse(xhr.responseText);
+                // document.getElementById('some-element').textContent = serverResponse.message;
+            } else if (xhr.status !== 200) {
+                // 服务器响应错误，可以显示错误信息或重试逻辑
+                alert('处理失败: ' + xhr.status);
+                processingMessage.style.display = 'none';
+                submitButton.disabled = false; // 启用按钮
+            }
+        };
+        xhr.send(formData);
+    });
+</script>
+
+</body>
+</html>
