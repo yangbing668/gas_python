@@ -19,12 +19,23 @@ class GasProductionWell(db.Model):
     collect_date = db.Column(db.Date)
     production_gas_day = db.Column(db.Float)
     # 可以添加其他方法和属性
-
+class GasProductionIncrease(db.Model):
+    id = db.Column(db.String, primary_key=True)  # 这里 id 是主键
+    well_no = db.Column(db.String)
+    platform_no = db.Column(db.String)
+    begin_time = db.Column(db.Date)
+    end_time = db.Column(db.Date)
+    days = db.Column(db.String)
+    before_pro = db.Column(db.Float)
+    after_pro = db.Column(db.Float)
+    amplify = db.Column(db.Float)
+    absolute_inc = db.Column(db.Float)
+    production_inc = db.Column(db.Float)
+    # 可以添加其他方法和属性
 
 @app.route('/')
 def index():
     return render_template('form.html')
-
 
 @app.route('/deal', methods=['POST'])
 def process_form():
@@ -99,20 +110,6 @@ def process_form():
     return "success"
     # return redirect(url_for('index'))  # 完成后重定向到首页
 
-
-class GasProductionIncrease(db.Model):
-    id = db.Column(db.String, primary_key=True)  # 这里 id 是主键
-    well_no = db.Column(db.String)
-    platform_no = db.Column(db.String)
-    begin_time = db.Column(db.Date)
-    end_time = db.Column(db.Date)
-    days = db.Column(db.String)
-    before_pro = db.Column(db.Float)
-    after_pro = db.Column(db.Float)
-    amplify = db.Column(db.Float)
-    absolute_inc = db.Column(db.Float)
-    production_inc = db.Column(db.Float)
-    # 可以添加其他方法和属性
 
 @app.route('/getIncreaseList', methods=['GET'])
 def getIncreaseList():
