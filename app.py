@@ -1,5 +1,6 @@
+import numpy as np
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, flash,jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 import uuid
 from util import pao_pai, zeng_ya, lx_qi_ju, jd_qi_ju
 from flask_sqlalchemy import SQLAlchemy
@@ -19,6 +20,7 @@ class GasProductionWell(db.Model):
     collect_date = db.Column(db.Date)
     production_gas_day = db.Column(db.Float)
     # 可以添加其他方法和属性
+
 class GasProductionIncrease(db.Model):
     id = db.Column(db.String, primary_key=True)  # 这里 id 是主键
     well_no = db.Column(db.String)
@@ -33,9 +35,18 @@ class GasProductionIncrease(db.Model):
     production_inc = db.Column(db.Float)
     # 可以添加其他方法和属性
 
+class GasCost(db.Model):
+    platform_no = db.Column(db.String, primary_key=True)
+    pp_cost = db.Column(db.Float)
+    lxqj_cost = db.Column(db.Float)
+    jdqj_cost = db.Column(db.Float)
+    zy_cost = db.Column(db.Float)
+
+
 @app.route('/')
 def index():
     return render_template('form.html')
+
 
 @app.route('/deal', methods=['POST'])
 def process_form():
@@ -51,18 +62,13 @@ def process_form():
         # 使用 pandas DataFrame 构造函数将字典列表转换为 DataFrame
         df_rcq = pd.DataFrame(data)
 
+    selectOption = request.form.get('selectOption')
+    pppath = request.files.get('pppath')
+    dr = float(request.form.get('dr'))
+    d = int(request.form.get('d'))
+    countdays = int(request.form.get('countdays'))
+    # price = float(request.form.get('price', '1.37'))
 
-    # rcqpath = request.form['rcqpath']
-
-    selectOption = request.form['selectOption']
-    # pppath = request.form['pppath']
-    pppath = request.files['pppath']
-
-    dr = float(request.form['dr'])
-    d = int(request.form['d'])
-    countdays = int(request.form['countdays'])
-    # savepath = request.form['savepath']
-    # print(rcqpath, selectOption, pppath, dr, d, countdays, savepath)
     print(selectOption, pppath, dr, d, countdays)
 
     if selectOption == '泡排':
@@ -80,17 +86,17 @@ def process_form():
     elif selectOption == '连续气举':
         df_lx_qi = lx_qi_ju(df_rcq, pppath, dr, d, countdays)
         df = df_lx_qi[['井号', '平台', '最初施工日期', '最后施工日期',
-                    '施工天数', '措施前平均日产', '措施后平均日产', '增幅',
-                    '绝对增加量', '增产气量']]
+                       '施工天数', '措施前平均日产', '措施后平均日产', '增幅',
+                       '绝对增加量', '增产气量']]
 
     elif selectOption == '间断气举':
         df_jd_qi = jd_qi_ju(df_rcq, pppath, dr, d, countdays)
         df = df_jd_qi[['井号', '平台', '最初施工日期', '最后施工日期',
-                    '施工天数', '措施前平均日产', '措施后平均日产', '增幅',
-                    '绝对增加量', '增产气量']]
+                       '施工天数', '措施前平均日产', '措施后平均日产', '增幅',
+                       '绝对增加量', '增产气量']]
 
+    # df['inc_output'] = df['production_inc'] * price
     df['id'] = df.index.map(lambda _: str(uuid.uuid4()))
-    # print(df)
 
     # df.columns = ['井号', '平台', '开始施工日期', '结束施工日期',
     #               '施工天数', '措施前平均日产', '措施后平均日产', '增幅',
@@ -107,15 +113,23 @@ def process_form():
 
     # df.to_csv(savepath, encoding='utf-8-sig', index=False)
 
-    # flash(message)  # 使用 Flask 的 flash 机制来显示消息
-    return "success"
+    json_response = {
+        "success": True,
+        "message": "",
+        "code": 200,
+        "result": {
+        }
+    }
+    return json_response
     # return redirect(url_for('index'))  # 完成后重定向到首页
+
 
 # 确保分页参数有默认值
 def get_pagination_args():
     pageNo = request.args.get('page', 1, type=int)
     pageSize = request.args.get('per_page', 10, type=int)
     return pageNo, pageSize
+
 
 @app.route('/getIncreaseList', methods=['GET'])
 def getIncreaseList():
@@ -127,34 +141,37 @@ def getIncreaseList():
 
         # 将结果转换为字典列表
         data = [
-            {'id': result.id, 'wellNo': result.well_no, 'platformNo': result.platform_no, 'beginTime': result.begin_time.strftime('%Y-%m-%d')
+            {'id': result.id, 'wellNo': result.well_no, 'platformNo': result.platform_no,
+             'beginTime': result.begin_time.strftime('%Y-%m-%d')
                 , 'endTime': result.end_time.strftime('%Y-%m-%d'), 'days': result.days, 'beforePro': result.before_pro,
-             'afterPro': result.after_pro, 'amplify': result.amplify, 'absoluteInc': result.absolute_inc, 'productionInc': result.production_inc
+             'afterPro': result.after_pro, 'amplify': result.amplify, 'absoluteInc': result.absolute_inc,
+             'productionInc': result.production_inc
              }
             for result in items]
     json_response = {
-            "success": True,
-            "message": "",
-            "code": 200,
-            "result": {
-                "records": data,
-                # 可以在响应中包含分页信息
-                'total': pagination.total,
-                'size': pageSize,
-                'current': pageNo,
-                "orders": [],
-                "optimizeCountsql": True,
-                "searchCount": "",
-                "countId": None,
-                "maxLimit": None,
-                "pages": pagination.pages
-            }
+        "success": True,
+        "message": "",
+        "code": 200,
+        "result": {
+            "records": data,
+            # 可以在响应中包含分页信息
+            'total': pagination.total,
+            'size': pageSize,
+            'current': pageNo,
+            "orders": [],
+            "optimizeCountsql": True,
+            "searchCount": "",
+            "countId": None,
+            "maxLimit": None,
+            "pages": pagination.pages
         }
+    }
     return json_response
 
 
 @app.route('/getIncreasePlatformList', methods=['GET'])
 def getIncreasePlatformList():
+    selectOption = request.args.get('selectOption', '泡排')
     with app.app_context():
         # 假设你想查询所有记录
         results = GasProductionIncrease.query.all()
@@ -164,18 +181,53 @@ def getIncreasePlatformList():
             for result in results]
         data = pd.DataFrame(data)
         production_sums = data.groupby('platform_no')['production_inc'].sum().reset_index()
-        print(production_sums)
 
-        json_response = {
-            "success": True,
-            "message": "",
-            "code": 200,
-            "result": {
-                "records": data
-            }
+        results = GasCost.query.all()
+        # 将结果转换为字典列表
+        data = [
+            {'platform_no': result.platform_no, 'pp_cost': result.pp_cost, 'lxqj_cost': result.lxqj_cost
+             , 'jdqj_cost': result.jdqj_cost, 'zy_cost': result.zy_cost}
+            for result in results]
+        gas_cost = pd.DataFrame(data)
+
+    if selectOption == '泡排':
+        gas_cost = gas_cost[['platform_no', 'pp_cost']]
+
+    elif selectOption == '增压':
+        gas_cost = gas_cost[['platform_no', 'zy_cost']]
+
+    elif selectOption == '连续气举':
+        gas_cost = gas_cost[['platform_no', 'lxqj_cost']]
+
+    elif selectOption == '间断气举':
+        gas_cost = gas_cost[['platform_no', 'jdqj_cost']]
+
+    production_sums['output'] = production_sums['production_inc'] * 1.37
+    input_output = pd.merge(production_sums, gas_cost, on=['platform_no'], how='left')
+    input_output.columns = ['platform_no', 'production_inc', 'output', 'input']
+    input_output['production_ratio'] = np.where(input_output['input'] == 0, 0, input_output['output'] / input_output['input'])
+
+    dataJson = [
+        {'platformNo': row.platform_no, 'production_inc': row.production_inc,
+         'output': row.output, 'input': row.input, 'production_ratio': row.production_ratio}
+        for row in input_output.itertuples(index=False)
+    ]
+    # 清空表中的数据
+    with app.app_context():
+        db.session.execute(text("DELETE FROM gas_production_input_output;"))
+        db.session.commit()  # 提交事务
+    input_output.to_sql('gas_production_input_output', con=db.engine, index=False, if_exists='append')
+
+    json_response = {
+        "success": True,
+        "message": "",
+        "code": 200,
+        "result": {
+            "records": dataJson
         }
-        return json_response
-    return "Fail"
+    }
+    return json_response
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -44,11 +44,6 @@
 
 <form id="gasWellForm" method="post" action="/deal">
 
-<!--    <div class="form-row">-->
-<!--        <label for="rcqpath">所有气井日产数据文件:</label>-->
-<!--        <input type="text" id="rcqpath" name="rcqpath" value="input/all-6.7.csv" required>-->
-<!--    </div>-->
-
     <div class="form-row">
         <label for="selectOption">增产措施方式:</label>
         <select id="selectOption" name="selectOption" required onchange="updateInputValues()">
@@ -82,10 +77,6 @@
         <input type="number" id="countdays" name="countdays" required>
     </div>
 
-<!--    <div class="form-row">-->
-<!--        <label for="savepath">增产气量结果保存地址:</label>-->
-<!--        <input type="text" id="savepath" name="savepath" required>-->
-<!--    </div>-->
 
     <div id="processing-message">处理中...</div>
     <div id="success-message">处理成功！</div>
