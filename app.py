@@ -53,6 +53,7 @@ def process_form():
 
 
     # rcqpath = request.form['rcqpath']
+
     selectOption = request.form['selectOption']
     # pppath = request.form['pppath']
     pppath = request.files['pppath']
@@ -110,29 +111,46 @@ def process_form():
     return "success"
     # return redirect(url_for('index'))  # 完成后重定向到首页
 
+# 确保分页参数有默认值
+def get_pagination_args():
+    pageNo = request.args.get('page', 1, type=int)
+    pageSize = request.args.get('per_page', 10, type=int)
+    return pageNo, pageSize
 
 @app.route('/getIncreaseList', methods=['GET'])
 def getIncreaseList():
+    pageNo, pageSize = get_pagination_args()
     with app.app_context():
-        # 假设你想查询所有记录
-        results = GasProductionIncrease.query.all()
+        # 使用paginate方法进行分页
+        pagination = GasProductionIncrease.query.paginate(page=pageNo, per_page=pageSize, error_out=False)
+        items = pagination.items
+
         # 将结果转换为字典列表
         data = [
-            {'id': result.id, 'well_no': result.well_no, 'platform_no': result.platform_no, 'begin_time': result.begin_time
-                , 'end_time': result.end_time, 'days': result.days, 'before_pro': result.before_pro,
-             'after_pro': result.after_pro, 'amplify': result.amplify, 'absolute_inc': result.absolute_inc, 'production_inc': result.production_inc
+            {'id': result.id, 'wellNo': result.well_no, 'platformNo': result.platform_no, 'beginTime': result.begin_time.strftime('%Y-%m-%d')
+                , 'endTime': result.end_time.strftime('%Y-%m-%d'), 'days': result.days, 'beforePro': result.before_pro,
+             'afterPro': result.after_pro, 'amplify': result.amplify, 'absoluteInc': result.absolute_inc, 'productionInc': result.production_inc
              }
-            for result in results]
-        json_response = {
+            for result in items]
+    json_response = {
             "success": True,
             "message": "",
             "code": 200,
             "result": {
-                "records": data
+                "records": data,
+                # 可以在响应中包含分页信息
+                'total': pagination.total,
+                'size': pageSize,
+                'current': pageNo,
+                "orders": [],
+                "optimizeCountsql": True,
+                "searchCount": "",
+                "countId": None,
+                "maxLimit": None,
+                "pages": pagination.pages
             }
         }
-        return json_response
-    return "Fail"
+    return json_response
 
 
 @app.route('/getIncreasePlatformList', methods=['GET'])

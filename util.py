@@ -99,7 +99,6 @@ def pao_pai(df_rcq, pppath, dr, d, countdays):
 
     df_rcq = conv_rcq(df_rcq)
 
-
     cal_avg_pp(df_pp, df_rcq, d)
     df_pp.loc[df_pp['增幅'] < 0, '增幅'] = 0
     df_pp.loc[df_pp['措施前平均日产'] < 0.1, '增幅'] = 1
