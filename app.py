@@ -292,7 +292,19 @@ def getCompressor():  # 输入进气压力 排气压力 排气量 --> 满足条�
     intake_pressure = float(request.args.get('intake_pressure', 2))  # 进气压力
     exhaust_pressure = float(request.args.get('exhaust_pressure', 6))  # 排气压力
     exhaust_gas = float(request.args.get('exhaust_gas', 3))  # 排气量
+    data = matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas)
+    json_response = {
+        "success": True,
+        "message": "",
+        "code": 200,
+        "result": {
+            "records": data,
+        }
+    }
+    return json_response
 
+
+def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入进气压力 排气压力 排气量 --> 满足条件的多个压缩机
     # 构建查询条件
     query = GasBaseCompressor.query.filter(
         GasBaseCompressor.intake_pressure_min <= intake_pressure,
@@ -347,16 +359,7 @@ def getCompressor():  # 输入进气压力 排气压力 排气量 --> 满足条�
                 'weight': result.weight,
                 'size': result.size,
             }]
-    json_response = {
-        "success": True,
-        "message": "",
-        "code": 200,
-        "result": {
-            "records": data,
-        }
-    }
-    return json_response
-
+    return data
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
