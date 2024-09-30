@@ -199,7 +199,8 @@ def process_form():
     df.columns = ['well_no', 'platform_no', 'begin_time', 'end_time',
                   'days', 'before_pro', 'after_pro', 'amplify',
                   'absolute_inc', 'production_inc', 'id']
-
+    df.loc[df['platform_no'] == '威208', 'platform_no'] = '威204H43'
+    df.loc[df['platform_no'] == '威209', 'platform_no'] = '威204H62'
     # 清空表中的数据
     with app.app_context():
         db.session.execute(text("DELETE FROM gas_production_increase;"))
@@ -228,7 +229,11 @@ def get_pagination_args():  # 分页默认值
 
 @app.route('/getIncreaseList', methods=['GET'])  # 获取增产气量
 def getIncreaseList():
-    pageNo, pageSize = get_pagination_args()
+    try:
+        pageNo = int(request.args.get('pageNo'))
+        pageSize = int(request.args.get('pageSize'))
+    except:
+        pageNo, pageSize = get_pagination_args()
     with app.app_context():
         # 使用paginate方法进行分页
         pagination = GasProductionIncrease.query.paginate(page=pageNo, per_page=pageSize, error_out=False)
@@ -264,7 +269,7 @@ def getIncreaseList():
     return json_response
 
 
-@app.route('/getIncreasePlatformList', methods=['GET'])  # 计算并获取投产比
+@app.route('/getIncreasePlatformList', methods=['GET', 'POST'])  # 计算并获取投产比
 def getIncreasePlatformList():
     selectOption = request.args.get('selectOption', '泡排')
     with app.app_context():

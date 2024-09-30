@@ -14,7 +14,8 @@ def conv_rcq(df_rcq):
     df_rcq.loc[df_rcq['日产气'] == ' ', '日产气'] = 0
     df_rcq.loc[df_rcq['日产气'] == '无', '日产气'] = 0
     df_rcq['日产气'] = df_rcq['日产气'].astype('float')
-    # df_rcq = df_rcq[['井号', '日期', '日产气']]
+
+    df_rcq = df_rcq[['井号', '日期', '日产气']]
     return df_rcq
 
 
@@ -239,43 +240,43 @@ def add_wei_if_not_first(s):
         return s
 
 
-def cal_avg_qj(df1, df2, d):
-    for i in range(len(df1)):
-        dt = df1.loc[i, '施工日期']
-        w = df1.loc[i, '作业井号']
-        df_new = df2.loc[df2['井号'] == w].reset_index(drop=True)
-        #         print(df_new)
-        if len(df_new.loc[df_new['日期'] == dt].index.values) != 0:
-            ind1 = df_new.loc[df_new['日期'] == dt].index.values[0]
-            if (dt - df_new.loc[0, '日期']).days < d:
-                ind0 = 0
-            else:
-                days_before = dt - timedelta(days=d)
-                ind0 = df_new.loc[df_new['日期'] == days_before].index.values[0]
-            if (df_new.loc[len(df_new) - 1, '日期'] - dt).days < d:
-                ind2 = len(df_new) - 1
-            else:
-                days_after = dt + timedelta(days=d)
-                ind2 = df_new.loc[df_new['日期'] == days_after].index.values[0]
-            # r_l1 = df_new.loc[ind0:ind1, '日产气'].tolist()
-            # r1 = [i for i in r_l1 if i]
-            r_l2 = df_new.loc[ind1 + 1:ind2, '日产气'].tolist()
-            r2 = [i for i in r_l2 if i]
-            # if r1 == []:
-            #     r1.append(0)
-            if r2 == []:
-                r2.append(0)
-            #             print(r1)
-            # df1.loc[i, '措施前平均日产'] = np.mean(r1)
-            df1.loc[i, '措施前平均日产'] = df1.loc[i, '增压前瞬量（万方/天）']
-            df1.loc[i, '措施后平均日产'] = np.mean(r2)
-            df1.loc[i, '增幅'] = (df1.loc[i, '措施后平均日产'] - df1.loc[i, '措施前平均日产']) / df1.loc[
-                i, '措施前平均日产']
-            df1.loc[i, '绝对增加量'] = df1.loc[i, '措施后平均日产'] - df1.loc[i, '措施前平均日产']
-
-
-#         else:
-#             print(w)
+# def cal_avg_qj(df1, df2, d):
+#     for i in range(len(df1)):
+#         dt = df1.loc[i, '施工日期']
+#         w = df1.loc[i, '作业井号']
+#         df_new = df2.loc[df2['井号'] == w].reset_index(drop=True)
+#         #         print(df_new)
+#         if len(df_new.loc[df_new['日期'] == dt].index.values) != 0:
+#             ind1 = df_new.loc[df_new['日期'] == dt].index.values[0]
+#             if (dt - df_new.loc[0, '日期']).days < d:
+#                 ind0 = 0
+#             else:
+#                 days_before = dt - timedelta(days=d)
+#                 ind0 = df_new.loc[df_new['日期'] == days_before].index.values[0]
+#             if (df_new.loc[len(df_new) - 1, '日期'] - dt).days < d:
+#                 ind2 = len(df_new) - 1
+#             else:
+#                 days_after = dt + timedelta(days=d)
+#                 ind2 = df_new.loc[df_new['日期'] == days_after].index.values[0]
+#             # r_l1 = df_new.loc[ind0:ind1, '日产气'].tolist()
+#             # r1 = [i for i in r_l1 if i]
+#             r_l2 = df_new.loc[ind1 + 1:ind2, '日产气'].tolist()
+#             r2 = [i for i in r_l2 if i]
+#             # if r1 == []:
+#             #     r1.append(0)
+#             if r2 == []:
+#                 r2.append(0)
+#             #             print(r1)
+#             # df1.loc[i, '措施前平均日产'] = np.mean(r1)
+#             df1.loc[i, '措施前平均日产'] = df1.loc[i, '增压前瞬量（万方/天）']
+#             df1.loc[i, '措施后平均日产'] = np.mean(r2)
+#             df1.loc[i, '增幅'] = (df1.loc[i, '措施后平均日产'] - df1.loc[i, '措施前平均日产']) / df1.loc[
+#                 i, '措施前平均日产']
+#             df1.loc[i, '绝对增加量'] = df1.loc[i, '措施后平均日产'] - df1.loc[i, '措施前平均日产']
+#
+#
+#         # else:
+#         #     print(w)
 
 
 def convert_to_number_or_zero(s):
@@ -373,7 +374,8 @@ def lx_qi_ju(df_rcq, qjpath, dr, d, countdays):
 
     df_qj = df_qj.loc[
         (df_qj['气举类型'] == '电驱气举') | (df_qj['气举类型'] == '增压机气举')].reset_index(drop=True)
-    df_qj.to_csv('df_qj.csv', encoding='utf-8-sig')
+    # df_qj.to_csv('df_qj.csv', encoding='utf-8-sig')
+    # print(df_qj)
 
     cal_avg_qj(df_qj, df_rcq, d)
     df_qj.loc[df_qj['增幅'] < 0, '增幅'] = 0
@@ -484,8 +486,8 @@ def cal_avg_qj(df1, df2, d):
             df1.loc[i, '绝对增加量'] = df1.loc[i, '措施后平均日产'] - df1.loc[i, '措施前平均日产']
 
 
-#         else:
-#             print(w)
+        # else:
+        #     print(w)
 
 
 def deal_temp(result, temp, days, i):
