@@ -346,7 +346,7 @@ def predict():
         columns_order = ['well_no'] + [col for col in df_with_predictions.columns if col != 'well_no']
         df_with_predictions = df_with_predictions[columns_order]
 
-        responses_variable = ['well_no', 'Predicted_330', 'Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in range(18)]
+        responses_variable = ['well_no', 'Predicted_330', 'days330_first_year','Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in range(18)]
         df_response = df_with_predictions[responses_variable]
         # Pagination logic
         total = len(df_response)  # Total number of wells
@@ -363,7 +363,7 @@ def predict():
             {"title": "井号", "dataIndex": "well_no"},
             {"title": "a值", "dataIndex": "a_values"},
             {"title": "m值", "dataIndex": "m_values"},
-            {"title": "首年实际累产", "dataIndex": ""},
+            {"title": "首年实际累产", "dataIndex": "Days330_first_year"},
             {"title": "首年预测累产", "dataIndex": "Predicted_330"},
             {"title": "EUR预测", "dataIndex": "Predicted_EUR"}
         ]
@@ -387,6 +387,9 @@ def predict():
             }
         }
         return jsonify(response)
+
+        table_name = 'gas_well_EUR_predict'  # 替换为你希望的SQL表名
+        df_response.to_sql(table_name, con=engine, index=False, if_exists='replace')
 
     except ValueError as ve:
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
