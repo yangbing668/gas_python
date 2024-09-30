@@ -359,6 +359,15 @@ def predict():
         # Convert to dictionary format with record-based representation
         records = df_paginated.to_dict(orient='records')
 
+        write_name = 'gas_well_eur_predict'  # 替换为你希望的SQL表名
+        df_response['id'] = [str(uuid.uuid4()) for _ in range(len(df_response))]  # 生成唯一的 ID
+        df_response['update_by'] = 'gas-admin'  # 更新人，默认为 system 或通过其他方式动态获取
+        df_response['update_time'] = datetime.now()  # 当前时间作为更新时间
+        df_response['sys_org_code'] = 'A11'  # 部门编号
+        df_response['create_by'] = 'gas-admin'  # 创建人
+        df_response['create_time'] = datetime.now()  # 创建时间
+        df_response.to_sql(write_name, con=engine, index=False, if_exists='replace')
+
         columns = [
             {"title": "井号", "dataIndex": "well_no"},
             {"title": "a值", "dataIndex": "a_values"},
@@ -387,9 +396,6 @@ def predict():
             }
         }
         return jsonify(response)
-
-        table_name = 'gas_well_EUR_predict'  # 替换为你希望的SQL表名
-        df_response.to_sql(table_name, con=engine, index=False, if_exists='replace')
 
     except ValueError as ve:
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
