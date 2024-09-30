@@ -408,9 +408,10 @@ def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入�
             }]
     return data
 
-
-@app.route('/predict', methods=['GET'])
+@app.route('/predict', methods=['GET','POST'])
 def predict():
+    if request.content_type != 'application/json':
+        return jsonify({"state": "error", "message": "Content-Type must be application/json"}), 415
     try:
         # Retrieve JSON from the front end
         data = request.json
@@ -550,10 +551,12 @@ def predict():
             }
         }
         return jsonify(response)
+
     except ValueError as ve:
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
     except Exception as e:
         return jsonify({"state": "error", "message": f"An error occurred: {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
