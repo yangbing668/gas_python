@@ -1,3 +1,4 @@
+import datetime
 from math import sqrt
 
 import numpy as np
@@ -199,7 +200,8 @@ def process_form():
     df.columns = ['well_no', 'platform_no', 'begin_time', 'end_time',
                   'days', 'before_pro', 'after_pro', 'amplify',
                   'absolute_inc', 'production_inc', 'id']
-
+    df.loc[df['platform_no'] == '威208', 'platform_no'] = '威204H43'
+    df.loc[df['platform_no'] == '威209', 'platform_no'] = '威204H62'
     # 清空表中的数据
     with app.app_context():
         db.session.execute(text("DELETE FROM gas_production_increase;"))
@@ -228,7 +230,11 @@ def get_pagination_args():  # 分页默认值
 
 @app.route('/getIncreaseList', methods=['GET'])  # 获取增产气量
 def getIncreaseList():
-    pageNo, pageSize = get_pagination_args()
+    try:
+        pageNo = int(request.args.get('pageNo'))
+        pageSize = int(request.args.get('pageSize'))
+    except:
+        pageNo, pageSize = get_pagination_args()
     with app.app_context():
         # 使用paginate方法进行分页
         pagination = GasProductionIncrease.query.paginate(page=pageNo, per_page=pageSize, error_out=False)
@@ -264,7 +270,7 @@ def getIncreaseList():
     return json_response
 
 
-@app.route('/getIncreasePlatformList', methods=['GET'])  # 计算并获取投产比
+@app.route('/getIncreasePlatformList', methods=['GET', 'POST'])  # 计算并获取投产比
 def getIncreasePlatformList():
     selectOption = request.args.get('selectOption', '泡排')
     with app.app_context():
@@ -408,10 +414,9 @@ def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入�
             }]
     return data
 
-@app.route('/predict', methods=['GET','POST'])
+
+@app.route('/predict', methods=['POST','GET'])
 def predict():
-    if request.content_type != 'application/json':
-        return jsonify({"state": "error", "message": "Content-Type must be application/json"}), 415
     try:
         # Retrieve JSON from the front end
         data = request.json
@@ -419,13 +424,13 @@ def predict():
             return jsonify({"state": "error", "message": "No data provided"}), 400
 
         # Retrieve models and parameters
-        selected_models = data.get('models', ['lgb'])  # Expected to be a list of strings ["rf", "xgb"]
+        selected_models = data.get('models', [])  # Expected to be a list of strings ["rf", "xgb"]
         final_model_choice = data.get('finalModel','mlp') # Ensure final_model is properly parsed
         learning_rate = data.get('learningRate', 0.01)  # Default learning rate
         n_splits = data.get('nSplits', 5)
 
         # Retrieve target variable from the front-end input
-        predict_variables = data.get('predictVariables')  # 获取前端传入的预测变量
+        predict_variables = data.get('predicrVariables')  # 获取前端传入的预测变量
         if not predict_variables:
             return jsonify({"state": "error", "message": "No target variable provided"}), 400
 
