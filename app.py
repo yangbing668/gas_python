@@ -372,9 +372,9 @@ def predict():
             {"title": "井号", "dataIndex": "well_no"},
             {"title": "a值", "dataIndex": "a_values"},
             {"title": "m值", "dataIndex": "m_values"},
-            {"title": "首年实际累产", "dataIndex": "Days330_first_year"},
-            {"title": "首年预测累产", "dataIndex": "Predicted_330"},
-            {"title": "EUR预测", "dataIndex": "Predicted_EUR"}
+            {"title": "首年实际累产", "dataIndex": "days330_first_year"},
+            {"title": "首年预测累产", "dataIndex": "predicted_330"},
+            {"title": "EUR预测", "dataIndex": "predicted_EUR"}
         ]
         for year in range(2, 19):  # 第2年到第19年
             columns.append({
