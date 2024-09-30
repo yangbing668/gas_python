@@ -718,3 +718,5 @@ def jd_qi_ju(df_rcq, qjpath, dr, d, countdays):
     print('间断气举总增产气量为：', np.sum(df['增产气量']))
     # df.to_csv(savepath, encoding='utf-8-sig')
     return df
+
+

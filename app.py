@@ -1,3 +1,12 @@
+from math import sqrt
+
+import numpy as np
+import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+import uuid
+from util import pao_pai, zeng_ya, lx_qi_ju, jd_qi_ju
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 import numpy as np
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
@@ -21,9 +30,7 @@ app = Flask(__name__)
 # 配置数据库URI
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:123456@192.168.0.189:3306/shale-gas'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-
 db = SQLAlchemy(app)
-
 
 # Database connection
 username = 'root'
@@ -32,10 +39,12 @@ host = '192.168.0.189'
 port = '3306'
 database = 'shale-gas'
 
+
 # Establish DB connection
 def get_db_connection():
     engine = create_engine(f'mysql+pymysql://{username}:{password}@{host}:{port}/{database}')
     return engine
+
 
 # Model mapping (simplified to use shorthand for models)
 model_mapping = {
@@ -46,10 +55,12 @@ model_mapping = {
 
 # Final model mapping
 final_model_mapping = {
-    "mlp": {"model": "MLPRegressor", "params": {"hidden_layer_sizes": [100, 50], "activation": "relu", "solver": "adam", "max_iter": 200}},
+    "mlp": {"model": "MLPRegressor",
+            "params": {"hidden_layer_sizes": [100, 50], "activation": "relu", "solver": "adam", "max_iter": 200}},
     "lasso": {"model": "Lasso", "params": {"alpha": 0.01}},
     "ridge": {"model": "Ridge", "params": {"alpha": 0.01}}
 }
+
 
 class GasProductionWell(db.Model):
     id = db.Column(db.String, primary_key=True)  # 这里 id 是主键
@@ -57,6 +68,7 @@ class GasProductionWell(db.Model):
     collect_date = db.Column(db.Date)
     production_gas_day = db.Column(db.Float)
     # 可以添加其他方法和属性
+
 
 class GasProductionIncrease(db.Model):
     id = db.Column(db.String, primary_key=True)  # 这里 id 是主键
@@ -72,6 +84,7 @@ class GasProductionIncrease(db.Model):
     production_inc = db.Column(db.Float)
     # 可以添加其他方法和属性
 
+
 class GasCost(db.Model):
     platform_no = db.Column(db.String, primary_key=True)
     pp_cost = db.Column(db.Float)
@@ -80,12 +93,57 @@ class GasCost(db.Model):
     zy_cost = db.Column(db.Float)
 
 
+class GasBaseCompressor(db.Model):  # 压缩机
+    id = db.Column(db.String, primary_key=True)
+    update_by = db.Column(db.String, default='', nullable=False, comment='更新人')
+    update_time = db.Column(db.DateTime, comment='更新日期')
+    sys_org_code = db.Column(db.String, default='', nullable=False, comment='所属部门')
+    create_by = db.Column(db.String, default='', nullable=False, comment='创建人')
+    create_time = db.Column(db.DateTime, comment='创建日期')
+    group_model = db.Column(db.String, comment='机组型号')
+    compressor_model = db.Column(db.String, comment='压缩机型号')
+    intake_pressure_min = db.Column(db.Float, comment='最小进气压力Mpa')
+    intake_pressure_max = db.Column(db.Float, comment='最大进气压力Mpa')
+    intake_pressure_optimal = db.Column(db.String, comment='进气压力最优')
+    intake_temperature = db.Column(db.Float, comment='进气温度℃')
+    exhaust_gas_min = db.Column(db.Float, comment='最小排气量Nm3/d')
+    exhaust_gas_max = db.Column(db.Float, comment='最大排气量Nm3/d')
+    exhaust_pressure = db.Column(db.Float, comment='排气压力Mpa')
+    exhaust_temperature = db.Column(db.Float, comment='排气温度℃')
+    compressor_columns = db.Column(db.Float, comment='压缩机列数')
+    compressor_cylinders = db.Column(db.Float, comment='压缩机气缸数')
+    rated_power = db.Column(db.Float, comment='电机额定功率kw')
+    rated_rotate_speed = db.Column(db.Float, comment='电机额定转速rpm')
+    weight = db.Column(db.Float, comment='重量')
+    size = db.Column(db.String, comment='尺寸(长×宽×高)')
+
+
+class GasCompressorWorkcondition(db.Model):  # 压缩机工况表
+    id = db.Column(db.String, primary_key=True)
+    update_by = db.Column(db.String, default='', nullable=False, comment='更新人')
+    update_time = db.Column(db.DateTime, comment='更新日期')
+    sys_org_code = db.Column(db.String, default='', nullable=False, comment='所属部门')
+    create_by = db.Column(db.String, default='', nullable=False, comment='创建人')
+    create_time = db.Column(db.DateTime, comment='创建日期')
+    compressor_id = db.Column(db.String, comment='所属压缩机组(关联主键)')
+    rotate_speed = db.Column(db.Float, comment='转速rpm')
+    grade1_intake_pressure = db.Column(db.Float, comment='一级进气压力mpa')
+    intake_temperature = db.Column(db.Float, comment='进气温度℃')
+    exhaust_gas = db.Column(db.Float, comment='排气量Nm3/d')
+    power = db.Column(db.Float, comment='功率kw')
+    power_load_rate = db.Column(db.Float, comment='轴功率负荷率%')
+    grade1_exhaust_pressure = db.Column(db.Float, comment='一级排气压力')
+    grade2_exhaust_pressure = db.Column(db.Float, comment='二级排气压力')
+    grade3_exhaust_pressure = db.Column(db.Float, comment='三级排气压力')
+    exhaust_temperature = db.Column(db.Float, comment='排气温度')
+
+
 @app.route('/')
 def index():
     return render_template('form.html')
 
 
-@app.route('/deal', methods=['POST'])
+@app.route('/deal', methods=['POST'])  # 计算增产气量
 def process_form():
     # pao_pai('alldata-2024.1.2.csv', '☆泡排台账-2023.12.31（川庆）.csv', 0.030, 30, '泡排增产气量.csv')
     # 确保在应用上下文中执行数据库操作
@@ -162,13 +220,13 @@ def process_form():
 
 
 # 确保分页参数有默认值
-def get_pagination_args():
+def get_pagination_args():  # 分页默认值
     pageNo = request.args.get('page', 1, type=int)
     pageSize = request.args.get('per_page', 10, type=int)
     return pageNo, pageSize
 
 
-@app.route('/getIncreaseList', methods=['GET'])
+@app.route('/getIncreaseList', methods=['GET'])  # 获取增产气量
 def getIncreaseList():
     pageNo, pageSize = get_pagination_args()
     with app.app_context():
@@ -206,7 +264,7 @@ def getIncreaseList():
     return json_response
 
 
-@app.route('/getIncreasePlatformList', methods=['GET'])
+@app.route('/getIncreasePlatformList', methods=['GET'])  # 计算并获取投产比
 def getIncreasePlatformList():
     selectOption = request.args.get('selectOption', '泡排')
     with app.app_context():
@@ -223,7 +281,7 @@ def getIncreasePlatformList():
         # 将结果转换为字典列表
         data = [
             {'platform_no': result.platform_no, 'pp_cost': result.pp_cost, 'lxqj_cost': result.lxqj_cost
-             , 'jdqj_cost': result.jdqj_cost, 'zy_cost': result.zy_cost}
+                , 'jdqj_cost': result.jdqj_cost, 'zy_cost': result.zy_cost}
             for result in results]
         gas_cost = pd.DataFrame(data)
 
@@ -242,7 +300,8 @@ def getIncreasePlatformList():
     production_sums['output'] = production_sums['production_inc'] * 1.37
     input_output = pd.merge(production_sums, gas_cost, on=['platform_no'], how='left')
     input_output.columns = ['platform_no', 'production_inc', 'output', 'input']
-    input_output['production_ratio'] = np.where(input_output['input'] == 0, 0, input_output['output'] / input_output['input'])
+    input_output['production_ratio'] = np.where(input_output['input'] == 0, 0,
+                                                input_output['output'] / input_output['input'])
 
     dataJson = [
         {'platformNo': row.platform_no, 'production_inc': row.production_inc,
@@ -264,6 +323,90 @@ def getIncreasePlatformList():
         }
     }
     return json_response
+
+
+# 定义一个函数来计算距离
+def calculate_distance(row, target_intake, target_exhaust, target_gas):
+    return sqrt(
+        (row.grade1_intake_pressure - target_intake) ** 2 +
+        (row.grade3_exhaust_pressure - target_exhaust) ** 2 +
+        (row.exhaust_gas - target_gas) ** 2
+    )
+
+
+@app.route('/getCompressor', methods=['GET'])  # 匹配压缩机
+def getCompressor():  # 输入进气压力 排气压力 排气量 --> 满足条件的多个压缩机
+    intake_pressure = float(request.args.get('intake_pressure', 2))  # 进气压力
+    exhaust_pressure = float(request.args.get('exhaust_pressure', 6))  # 排气压力
+    exhaust_gas = float(request.args.get('exhaust_gas', 3))  # 排气量
+    data = matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas)
+    json_response = {
+        "success": True,
+        "message": "",
+        "code": 200,
+        "result": {
+            "records": data,
+        }
+    }
+    return json_response
+
+
+def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入进气压力 排气压力 排气量 --> 满足条件的多个压缩机
+    # 构建查询条件
+    query = GasBaseCompressor.query.filter(
+        GasBaseCompressor.intake_pressure_min <= intake_pressure,
+        GasBaseCompressor.intake_pressure_max >= intake_pressure,
+        GasBaseCompressor.exhaust_pressure >= exhaust_pressure,
+        GasBaseCompressor.exhaust_gas_min <= exhaust_gas,
+        GasBaseCompressor.exhaust_gas_max >= exhaust_gas
+    )
+    with app.app_context():
+        # 执行查询并获取结果
+        compressors = query.all()
+        compressor_ids = [result.id for result in compressors]
+        # 使用in_操作符进行查询
+        results = GasCompressorWorkcondition.query.filter(
+            GasCompressorWorkcondition.compressor_id.in_(compressor_ids)).all()
+
+    # 初始化最小距离和最佳匹配行
+    min_distance = float('inf')
+    best_match = None
+    # 遍历查询结果，找到最接近的匹配
+    for row in results:
+        distance = calculate_distance(row, intake_pressure, exhaust_pressure, exhaust_gas)
+        if distance < min_distance or (
+                distance == min_distance and row.power < (best_match.power if best_match else float('inf'))):
+            min_distance = distance
+            best_match = row
+
+    best_match_compressor_id = best_match.compressor_id
+    for result in compressors:
+        if result.id == best_match_compressor_id:
+            data = [{
+                'id': result.id,
+                'updateBy': result.update_by,
+                'updateTime': result.update_time.isoformat() if result.update_time else None,
+                'sysOrgCode': result.sys_org_code,
+                'createBy': result.create_by,  # 同样，这个通常也会保持 createBy
+                'createTime': result.create_time.isoformat() if result.create_time else None,
+                'groupModel': result.group_model,
+                'compressorModel': result.compressor_model,
+                'intakePressureMin': result.intake_pressure_min,
+                'intakePressureMax': result.intake_pressure_max,
+                'intakePressureOptimal': result.intake_pressure_optimal,
+                'intakeTemperature': result.intake_temperature,
+                'exhaustGasMin': result.exhaust_gas_min,
+                'exhaustGasMax': result.exhaust_gas_max,
+                'exhaustPressure': result.exhaust_pressure,
+                'exhaustTemperature': result.exhaust_temperature,
+                'compressorColumns': result.compressor_columns,
+                'compressorCylinders': result.compressor_cylinders,
+                'ratedPower': result.rated_power,
+                'ratedRotateSpeed': result.rated_rotate_speed,
+                'weight': result.weight,
+                'size': result.size,
+            }]
+    return data
 
 
 @app.route('/predict', methods=['POST'])
@@ -310,7 +453,8 @@ def predict():
         # Connect to the database and retrieve data
         engine = get_db_connection()
         table_name = 'gas_well_para'
-        noprocess_var = ['id', 'update_by', 'update_time', 'sys_org_code', 'create_by', 'create_time', 'actual_production', 'duong_production', 'lng', 'lat', 'well_state']
+        noprocess_var = ['id', 'update_by', 'update_time', 'sys_org_code', 'create_by', 'create_time',
+                         'actual_production', 'duong_production', 'lng', 'lat', 'well_state']
         df = pd.read_sql_table(table_name, con=engine)
         df = df.drop(noprocess_var, axis=1)
 
@@ -323,7 +467,7 @@ def predict():
 
         # Perform cross+alidation and prediction
         df_with_predictions = cross_validate_and_predict(
-            df_combined, p_model=stacking_model, a_model=stacking_model, m_model=stacking_model, n_splits = n_splits)
+            df_combined, p_model=stacking_model, a_model=stacking_model, m_model=stacking_model, n_splits=n_splits)
 
         # 计算每一个气井的EUR
         well_ids = df_with_predictions.index.unique()
@@ -346,7 +490,8 @@ def predict():
         columns_order = ['well_no'] + [col for col in df_with_predictions.columns if col != 'well_no']
         df_with_predictions = df_with_predictions[columns_order]
 
-        responses_variable = ['well_no', 'Predicted_330', 'days330_first_year','Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in range(18)]
+        responses_variable = ['well_no', 'Predicted_330', 'Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in
+                                                                              range(18)]
         df_response = df_with_predictions[responses_variable]
         # Pagination logic
         total = len(df_response)  # Total number of wells
@@ -359,22 +504,13 @@ def predict():
         # Convert to dictionary format with record-based representation
         records = df_paginated.to_dict(orient='records')
 
-        write_name = 'gas_well_eur_predict'  # 替换为你希望的SQL表名
-        df_response['id'] = [str(uuid.uuid4()) for _ in range(len(df_response))]  # 生成唯一的 ID
-        df_response['update_by'] = 'gas-admin'  # 更新人，默认为 system 或通过其他方式动态获取
-        df_response['update_time'] = datetime.now()  # 当前时间作为更新时间
-        df_response['sys_org_code'] = 'A11'  # 部门编号
-        df_response['create_by'] = 'gas-admin'  # 创建人
-        df_response['create_time'] = datetime.now()  # 创建时间
-        df_response.to_sql(write_name, con=engine, index=False, if_exists='replace')
-
         columns = [
             {"title": "井号", "dataIndex": "well_no"},
             {"title": "a值", "dataIndex": "a_values"},
             {"title": "m值", "dataIndex": "m_values"},
-            {"title": "首年实际累产", "dataIndex": "days330_first_year"},
-            {"title": "首年预测累产", "dataIndex": "predicted_330"},
-            {"title": "EUR预测", "dataIndex": "predicted_EUR"}
+            {"title": "首年实际累产", "dataIndex": ""},
+            {"title": "首年预测累产", "dataIndex": "Predicted_330"},
+            {"title": "EUR预测", "dataIndex": "Predicted_EUR"}
         ]
         for year in range(2, 19):  # 第2年到第19年
             columns.append({
@@ -391,7 +527,7 @@ def predict():
                 "total": total,  # Total number of wells
                 "size": size,  # Number of wells per page
                 "pages": pages,  # Total number of pages
-                "current": page, # Current page number
+                "current": page,  # Current page number
                 "columns": columns  # 将表头数据返回
             }
         }
@@ -401,6 +537,7 @@ def predict():
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
     except Exception as e:
         return jsonify({"state": "error", "message": f"An error occurred: {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
