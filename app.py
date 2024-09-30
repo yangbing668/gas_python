@@ -408,7 +408,6 @@ def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入�
             }]
     return data
 
-
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
@@ -419,9 +418,14 @@ def predict():
 
         # Retrieve models and parameters
         selected_models = data.get('models', [])  # Expected to be a list of strings ["rf", "xgb"]
-        final_model_choice = data.get('final_model', {}).get('value', 'mlp')  # Ensure final_model is properly parsed
-        learning_rate = data.get('learning_rate', 0.01)  # Default learning rate
-        n_splits = data.get('n_splits', 5)
+        final_model_choice = data.get('finalModel','mlp') # Ensure final_model is properly parsed
+        learning_rate = data.get('learningRate', 0.01)  # Default learning rate
+        n_splits = data.get('nSplits', 5)
+
+        # Retrieve target variable from the front-end input
+        predict_variables = data.get('predictVariables')  # 获取前端传入的预测变量
+        if not predict_variables:
+            return jsonify({"state": "error", "message": "No target variable provided"}), 400
 
         page = int(data.get('pageNo', 1))  # Default to page 1 if not provided
         size = int(data.get('pageSize', 10))
@@ -457,6 +461,9 @@ def predict():
         df = pd.read_sql_table(table_name, con=engine)
         df = df.drop(noprocess_var, axis=1)
 
+        base_variables = ['well_no','well_type','m_values','a_values', 'days330_first_year','core_area']
+        df = df[predict_variables+base_variables]
+
         # Data processing
         Dataset_X, Dataset_y_a, Dataset_y_m, Dataset_y_p = process_data(df)
         df_combined = pd.concat([Dataset_X, Dataset_y_a, Dataset_y_m, Dataset_y_p], axis=1)
@@ -491,6 +498,7 @@ def predict():
 
         responses_variable = ['well_no', 'Predicted_330', 'days330_first_year','Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in range(18)]
         df_response = df_with_predictions[responses_variable]
+        df_response['MAE'] = df_response.apply(lambda row: mean_absolute_error([row['days330_first_year']], [row['Predicted_330']]), axis=1)
         # Pagination logic
         total = len(df_response)  # Total number of wells
         pages = math.ceil(total / size)  # Total number of pages
@@ -510,6 +518,7 @@ def predict():
         df_response['create_by'] = 'gas-admin'  # 创建人
         df_response['create_time'] = datetime.now()  # 创建时间
         df_response.to_sql(write_name, con=engine, index=False, if_exists='replace')
+
 
         columns = [
             {"title": "井号", "dataIndex": "well_no"},
@@ -544,6 +553,8 @@ def predict():
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
     except Exception as e:
         return jsonify({"state": "error", "message": f"An error occurred: {str(e)}"}), 500
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
