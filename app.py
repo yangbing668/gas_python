@@ -550,7 +550,6 @@ def predict():
             }
         }
         return jsonify(response)
-
     except ValueError as ve:
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
     except Exception as e:
