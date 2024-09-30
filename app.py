@@ -408,7 +408,8 @@ def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入�
             }]
     return data
 
-@app.route('/predict', methods=['POST'])
+
+@app.route('/predict', methods=['GET'])
 def predict():
     try:
         # Retrieve JSON from the front end
@@ -417,7 +418,7 @@ def predict():
             return jsonify({"state": "error", "message": "No data provided"}), 400
 
         # Retrieve models and parameters
-        selected_models = data.get('models', [])  # Expected to be a list of strings ["rf", "xgb"]
+        selected_models = data.get('models', ['lgb'])  # Expected to be a list of strings ["rf", "xgb"]
         final_model_choice = data.get('finalModel','mlp') # Ensure final_model is properly parsed
         learning_rate = data.get('learningRate', 0.01)  # Default learning rate
         n_splits = data.get('nSplits', 5)
@@ -426,6 +427,7 @@ def predict():
         predict_variables = data.get('predictVariables')  # 获取前端传入的预测变量
         if not predict_variables:
             return jsonify({"state": "error", "message": "No target variable provided"}), 400
+
 
         page = int(data.get('pageNo', 1))  # Default to page 1 if not provided
         size = int(data.get('pageSize', 10))
@@ -553,8 +555,6 @@ def predict():
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
     except Exception as e:
         return jsonify({"state": "error", "message": f"An error occurred: {str(e)}"}), 500
-
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
