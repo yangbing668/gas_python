@@ -453,8 +453,7 @@ def predict():
         # Connect to the database and retrieve data
         engine = get_db_connection()
         table_name = 'gas_well_para'
-        noprocess_var = ['id', 'update_by', 'update_time', 'sys_org_code', 'create_by', 'create_time',
-                         'actual_production', 'duong_production', 'lng', 'lat', 'well_state']
+        noprocess_var = ['id', 'update_by', 'update_time', 'sys_org_code', 'create_by', 'create_time', 'actual_production', 'duong_production', 'lng', 'lat', 'well_state']
         df = pd.read_sql_table(table_name, con=engine)
         df = df.drop(noprocess_var, axis=1)
 
@@ -467,7 +466,7 @@ def predict():
 
         # Perform cross+alidation and prediction
         df_with_predictions = cross_validate_and_predict(
-            df_combined, p_model=stacking_model, a_model=stacking_model, m_model=stacking_model, n_splits=n_splits)
+            df_combined, p_model=stacking_model, a_model=stacking_model, m_model=stacking_model, n_splits = n_splits)
 
         # 计算每一个气井的EUR
         well_ids = df_with_predictions.index.unique()
@@ -490,8 +489,7 @@ def predict():
         columns_order = ['well_no'] + [col for col in df_with_predictions.columns if col != 'well_no']
         df_with_predictions = df_with_predictions[columns_order]
 
-        responses_variable = ['well_no', 'Predicted_330', 'Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in
-                                                                              range(18)]
+        responses_variable = ['well_no', 'Predicted_330', 'days330_first_year','Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in range(18)]
         df_response = df_with_predictions[responses_variable]
         # Pagination logic
         total = len(df_response)  # Total number of wells
@@ -504,11 +502,20 @@ def predict():
         # Convert to dictionary format with record-based representation
         records = df_paginated.to_dict(orient='records')
 
+        write_name = 'gas_well_eur_predict'  # 替换为你希望的SQL表名
+        df_response['id'] = [str(uuid.uuid4()) for _ in range(len(df_response))]  # 生成唯一的 ID
+        df_response['update_by'] = 'gas-admin'  # 更新人，默认为 system 或通过其他方式动态获取
+        df_response['update_time'] = datetime.now()  # 当前时间作为更新时间
+        df_response['sys_org_code'] = 'A11'  # 部门编号
+        df_response['create_by'] = 'gas-admin'  # 创建人
+        df_response['create_time'] = datetime.now()  # 创建时间
+        df_response.to_sql(write_name, con=engine, index=False, if_exists='replace')
+
         columns = [
             {"title": "井号", "dataIndex": "well_no"},
             {"title": "a值", "dataIndex": "a_values"},
             {"title": "m值", "dataIndex": "m_values"},
-            {"title": "首年实际累产", "dataIndex": ""},
+            {"title": "首年实际累产", "dataIndex": "Days330_first_year"},
             {"title": "首年预测累产", "dataIndex": "Predicted_330"},
             {"title": "EUR预测", "dataIndex": "Predicted_EUR"}
         ]
@@ -527,7 +534,7 @@ def predict():
                 "total": total,  # Total number of wells
                 "size": size,  # Number of wells per page
                 "pages": pages,  # Total number of pages
-                "current": page,  # Current page number
+                "current": page, # Current page number
                 "columns": columns  # 将表头数据返回
             }
         }
@@ -537,7 +544,6 @@ def predict():
         return jsonify({"state": "error", "message": f"ValueError: {str(ve)}"}), 400
     except Exception as e:
         return jsonify({"state": "error", "message": f"An error occurred: {str(e)}"}), 500
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
