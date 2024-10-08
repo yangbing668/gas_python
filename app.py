@@ -24,6 +24,9 @@ from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.linear_model import Lasso, Ridge
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import r2_score
+from sklearn.metrics import mean_absolute_error
 import math
 from math import sqrt
 
@@ -415,8 +418,24 @@ def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入�
     return data
 
 
-@app.route('/predict', methods=['POST','GET'])
+@app.route('/predict', methods=['GET','POST'])
 def predict():
+    model_mapping = {
+        "rf": {"model": "RandomForestRegressor", "params": {"n_estimators": 100, "random_state": 42}},
+        "svr": {"model": "XGBRegressor", "params": {"n_estimators": 100}},
+        "lgb": {"model": "LGBMRegressor", "params": {"n_estimators": 100}},
+    }
+    # Final model mapping
+    final_model_mapping = {
+        "mlp": {"model": "MLPRegressor",
+                "params": {"hidden_layer_sizes": [100, 50], "activation": "relu", "solver": "adam", "max_iter": 200}},
+        "lasso": {"model": "Lasso", "params": {"alpha": 0.01}},
+        "ridge": {"model": "Ridge", "params": {"alpha": 0.01}}
+    }
+    print(request.headers)  # 检查请求头是否包含正确的 Content-Type
+    print(request.data)  # 检查接收到的原始数据
+    if request.content_type != 'application/json':
+        return jsonify({"state": "error", "message": "Content-Type must be application/json"}), 415
     try:
         # Retrieve JSON from the front end
         data = request.json
@@ -424,13 +443,13 @@ def predict():
             return jsonify({"state": "error", "message": "No data provided"}), 400
 
         # Retrieve models and parameters
-        selected_models = data.get('models', [])  # Expected to be a list of strings ["rf", "xgb"]
+        selected_models = data.get('models', ['lgb'])  # Expected to be a list of strings ["rf", "xgb"]
         final_model_choice = data.get('finalModel','mlp') # Ensure final_model is properly parsed
         learning_rate = data.get('learningRate', 0.01)  # Default learning rate
         n_splits = data.get('nSplits', 5)
 
         # Retrieve target variable from the front-end input
-        predict_variables = data.get('predicrVariables')  # 获取前端传入的预测变量
+        predict_variables = data.get('predictVariables')  # 获取前端传入的预测变量
         if not predict_variables:
             return jsonify({"state": "error", "message": "No target variable provided"}), 400
 
@@ -562,6 +581,5 @@ def predict():
     except Exception as e:
         return jsonify({"state": "error", "message": f"An error occurred: {str(e)}"}), 500
 
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='1.127.0.0', port=5000, debug=True)
