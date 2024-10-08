@@ -420,42 +420,18 @@ def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入�
 
 @app.route('/predict', methods=['GET','POST'])
 def predict():
-    model_mapping = {
-        "rf": {"model": "RandomForestRegressor", "params": {"n_estimators": 100, "random_state": 42}},
-        "svr": {"model": "XGBRegressor", "params": {"n_estimators": 100}},
-        "lgb": {"model": "LGBMRegressor", "params": {"n_estimators": 100}},
-    }
-    # Final model mapping
-    final_model_mapping = {
-        "mlp": {"model": "MLPRegressor",
-                "params": {"hidden_layer_sizes": [100, 50], "activation": "relu", "solver": "adam", "max_iter": 200}},
-        "lasso": {"model": "Lasso", "params": {"alpha": 0.01}},
-        "ridge": {"model": "Ridge", "params": {"alpha": 0.01}}
-    }
-    print(request.headers)  # 检查请求头是否包含正确的 Content-Type
-    print(request.data)  # 检查接收到的原始数据
-    if request.content_type != 'application/json':
-        return jsonify({"state": "error", "message": "Content-Type must be application/json"}), 415
     try:
-        # Retrieve JSON from the front end
-        data = request.json
-        if not data:
-            return jsonify({"state": "error", "message": "No data provided"}), 400
+        # Retrieve form data
+        selected_models = request.form.getlist('models') or ['lgb']
+        final_model_choice = request.form.get('finalModel', 'mlp')  # Default to "mlp" if not provided
+        learning_rate = float(request.form.get('learningRate', 0.01))  # Default learning rate is 0.01
+        n_splits = int(request.form.get('nSplits', 5))  # Default to 5 splits
+        predict_variables = request.form.getlist('predictVariables') or ['brmc1_layer']
+        page = int(request.form.get('pageNo', 1))  # Default to page 1
+        size = int(request.form.get('pageSize', 10))  # Default page size is 10
 
-        # Retrieve models and parameters
-        selected_models = data.get('models', ['lgb'])  # Expected to be a list of strings ["rf", "xgb"]
-        final_model_choice = data.get('finalModel','mlp') # Ensure final_model is properly parsed
-        learning_rate = data.get('learningRate', 0.01)  # Default learning rate
-        n_splits = data.get('nSplits', 5)
-
-        # Retrieve target variable from the front-end input
-        predict_variables = data.get('predictVariables')  # 获取前端传入的预测变量
-        if not predict_variables:
-            return jsonify({"state": "error", "message": "No target variable provided"}), 400
-
-
-        page = int(data.get('pageNo', 1))  # Default to page 1 if not provided
-        size = int(data.get('pageSize', 10))
+        #if not predict_variables:
+            #return jsonify({"state": "error", "message": "No target variable provided"}), 400
 
         # Build base learners
         base_learners_config = {}
@@ -581,5 +557,6 @@ def predict():
     except Exception as e:
         return jsonify({"state": "error", "message": f"An error occurred: {str(e)}"}), 500
 
+
 if __name__ == '__main__':
-    app.run(host='1.127.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
