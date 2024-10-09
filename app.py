@@ -417,7 +417,6 @@ def matchCompressor(intake_pressure, exhaust_pressure, exhaust_gas):  # 输入�
             }]
     return data
 
-
 @app.route('/predict', methods=['GET','POST'])
 def predict():
     try:
@@ -481,7 +480,7 @@ def predict():
         # 计算每一个气井的EUR
         well_ids = df_with_predictions.index.unique()
         eur_values = []
-        year_production_values = {f'Year_{i + 1}_Production': [] for i in range(19)}  # 为19年生成列
+        year_production_values = {f'Year_{i + 1}_Production': [] for i in range(20)}  # 为19年生成列
         for well_id in well_ids:
             well_data = df_with_predictions[df_with_predictions.index == well_id]
             a_fit = well_data['Predicted_a'].values[0]
@@ -489,7 +488,7 @@ def predict():
             first_production = well_data['Predicted_330'].values[0]
             year_production, eur = eur_function(first_production, a_fit, m_fit)
             eur_values.append(eur)
-            for i in range(19):
+            for i in range(20):
                 year_production_values[f'Year_{i + 1}_Production'].append(year_production[i])
 
         for year_col, year_values in year_production_values.items():
@@ -499,9 +498,16 @@ def predict():
         columns_order = ['well_no'] + [col for col in df_with_predictions.columns if col != 'well_no']
         df_with_predictions = df_with_predictions[columns_order]
 
-        responses_variable = ['well_no', 'Predicted_330', 'days330_first_year','Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in range(18)]
+        def mean_relative_error(y_true, y_pred):
+            return np.abs((y_true - y_pred) / y_true)
+
+        responses_variable = ['well_no', 'Predicted_330', 'days330_first_year','Predicted_EUR'] + [f'Year_{i + 2}_Production' for i in range(19)]
         df_response = df_with_predictions[responses_variable]
+
         df_response['MAE'] = df_response.apply(lambda row: mean_absolute_error([row['days330_first_year']], [row['Predicted_330']]), axis=1)
+        df_response['MRE'] = df_response.apply(
+            lambda row: (row['MAE']/row['days330_first_year']), axis=1)
+
         # Pagination logic
         total = len(df_response)  # Total number of wells
         pages = math.ceil(total / size)  # Total number of pages
@@ -511,17 +517,28 @@ def predict():
         # Paginated result
         df_paginated = df_response.iloc[start:end]
         # Convert to dictionary format with record-based representation
-        records = df_paginated.to_dict(orient='records')
 
-        write_name = 'gas_well_eur_predict'  # 替换为你希望的SQL表名
+        write_name = 'gas_eur_predict'  # 替换为你希望的SQL表名
         df_response['id'] = [str(uuid.uuid4()) for _ in range(len(df_response))]  # 生成唯一的 ID
         df_response['update_by'] = 'gas-admin'  # 更新人，默认为 system 或通过其他方式动态获取
         df_response['update_time'] = datetime.now()  # 当前时间作为更新时间
         df_response['sys_org_code'] = 'A11'  # 部门编号
         df_response['create_by'] = 'gas-admin'  # 创建人
         df_response['create_time'] = datetime.now()  # 创建时间
-        df_response.to_sql(write_name, con=engine, index=False, if_exists='replace')
 
+        metadata = MetaData()
+        table = Table(write_name, metadata, autoload_with=engine)
+        sql_columns = [column.name for column in table.columns]
+        df_response = df_response[sql_columns]
+
+        df_response['update_time'] = pd.to_datetime(df_response['update_time'])
+        df_response['create_time'] = pd.to_datetime(df_response['create_time'])
+
+        df_response['well_no'] = df_response['well_no'].astype(str)
+        df_response['id'] = df_response['id'].astype(str)
+        df_response['update_by'] = df_response['update_by'].astype(str)
+        df_response['sys_org_code'] = df_response['sys_org_code'].astype(str)
+        df_response['create_by'] = df_response['create_by'].astype(str)
 
         columns = [
             {"title": "井号", "dataIndex": "well_no"},
@@ -529,13 +546,22 @@ def predict():
             {"title": "m值", "dataIndex": "m_values"},
             {"title": "首年实际累产", "dataIndex": "Days330_first_year"},
             {"title": "首年预测累产", "dataIndex": "Predicted_330"},
-            {"title": "EUR预测", "dataIndex": "Predicted_EUR"}
+            {"title": "EUR预测", "dataIndex": "Predicted_EUR"},
+            {"title": "绝对误差值", "dataIndex": "MAE"},
+            {"title": "绝对误差率", "dataIndex": "MRE"}
         ]
-        for year in range(2, 19):  # 第2年到第19年
+        for year in range(2, 20):  # 第2年到第19年
             columns.append({
                 "title": f"第{year}年产量",
                 "dataIndex": f"Year_{year}_Production"
             })
+
+
+        with engine.connect() as connection:
+            connection.execute(text(f"TRUNCATE TABLE {write_name}"))
+        # 然后使用 pandas 的 to_sql() 插入新的数据
+        df_response.to_sql(write_name, con=engine, index=False, if_exists='append')
+        records = df_paginated.to_dict(orient='records')
 
         # Return the result as JSON
         response = {
